@@ -1,37 +1,31 @@
 # Set the base image
 FROM openjdk:8-jre-alpine
 
-# Dockerfile author / maintainer
-MAINTAINER SourceLab.org <stephen.powis@gmail.com>
-
-## Define what version of Kafka Webview to build the image using.
-ENV WEBVIEW_VER="2.1.2" \
-    WEBVIEW_SHA1="9b321f3955c884282d18f0a1c6821fcb84b70afb" \
-    WEBVIEW_HOME="/app"
-
+ARG VERSION
 # Create app and data directories
-RUN mkdir -p ${WEBVIEW_HOME} && \
-    mkdir -p ${WEBVIEW_HOME}/logs && \
-    mkdir -p ${WEBVIEW_HOME}/data && \
-    apk add --update bash curl && \
+RUN mkdir -p /app
+WORKDIR /app
+
+# Download latest distribution inside image
+# Extract package into /app stripping top level directory contained within the zip.
+ADD ./kafka-webview-ui/target/kafka-webview-ui-$VERSION-bin.zip .
+RUN unzip -d /app kafka-webview-ui-*-bin.zip && \
+    rm -f /app/kafka-webview-ui-*-bin.zip && \
+    f=`ls` && \
+    mv /app/*/* /app && \
+    rmdir $f && \
+    rm -f /app/kafka-webview-ui-*-sources.jar && \
+    rm -f /app/kafka-webview-ui-*-javadoc.jar && \
+    apk add --update bash && \
     rm -rf /var/cache/apk/*
 
-WORKDIR ${WEBVIEW_HOME}
-
-# Download KafkaWebview Release from Github project
-RUN curl -fSL -o /tmp/kafka-webview-ui-bin.zip https://oss.sonatype.org/service/local/repositories/orgsourcelab-1015/content/org/sourcelab/kafka-webview-ui/${WEBVIEW_VER}/kafka-webview-ui-${WEBVIEW_VER}-bin.zip
-
-# Verify SHA1 hash and extract.
-RUN echo "${WEBVIEW_SHA1}  /tmp/kafka-webview-ui-bin.zip" | sha1sum -c - && \
-    unzip -d ${WEBVIEW_HOME} /tmp/kafka-webview-ui-bin.zip && \
-    mv ${WEBVIEW_HOME}/kafka-webview-ui-${WEBVIEW_VER}/* ${WEBVIEW_HOME} && \
-    rm -rf ${WEBVIEW_HOME}/kafka-webview-ui-${WEBVIEW_VER}/ && \
-    rm -rf ${WEBVIEW_HOME}/src && \
-    rm -f /tmp/kafka-webview-ui-bin.zip
-
 # Create volume to persist data
-VOLUME ${WEBVIEW_HOME}/data
+VOLUME /app/data
 
+RUN chown -R nobody:nobody /app && \
+    chown -R nobody:nobody /app/data
+
+USER nobody
 # Expose port
 EXPOSE 8080
 
